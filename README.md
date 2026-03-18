@@ -103,32 +103,6 @@ gameControllerBattery/
 - Version: `1.0.0`
 - Author: `Mohammad Hujair`
 
-## Publishing
-
-1. Create a GitHub repository for this plugin and push the code.
-2. Ensure these publication files are present:
-  - `plugin.json`
-  - `README.md`
-  - at least one screenshot (currently `dms-screenshot-1773854869435.png`)
-3. Tag and push the release:
-
-```bash
-git tag v1.0.0
-git push --tags
-```
-
-4. Submit the plugin to `dms-plugin-registry` by opening a pull request with this repo link and metadata.
-
-### Useful examples
-
-- `ColorDemoPlugin`
-- `ExampleEmojiPlugin`
-- `ControlCenterExample`
-- `LauncherExample`
-- `WallpaperWatcherDaemon`
-- `DankGifSearch`
-- `DankStickerSearch`
-
 ## License
 
 MIT (or project default if inherited from DankMaterialShell).
