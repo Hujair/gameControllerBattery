@@ -1,0 +1,295 @@
+import QtQuick
+import qs.Common
+import qs.Services
+import qs.Widgets
+import qs.Modules.Plugins
+
+PluginComponent {
+    id: root
+
+    property string fallbackText: pluginData.displayText || "Controller"
+    property string controllerName: ""
+    property int controllerBatteryLevel: -1
+    property bool controllerBatteryCharging: false
+    property string controllerBatteryStatus: ""
+    property int _scanToken: 0
+
+    readonly property int refreshIntervalSeconds: (pluginData.refreshInterval ?? 15)
+    readonly property int refreshIntervalMs: refreshIntervalSeconds * 1000
+
+    readonly property string upowerService: "org.freedesktop.UPower"
+    readonly property string upowerPath: "/org/freedesktop/UPower"
+    readonly property string upowerInterface: "org.freedesktop.UPower"
+    readonly property string upowerDeviceInterface: "org.freedesktop.UPower.Device"
+    readonly property bool hasControllerBattery: controllerBatteryLevel >= 0
+    readonly property string controllerStatusText: {
+        if (!hasControllerBattery)
+            return "";
+        return controllerBatteryStatus || (controllerBatteryCharging ? "Charging" : "Discharging");
+    }
+    readonly property string controllerPercentageText: hasControllerBattery ? (controllerBatteryLevel + "%") : " - "
+    readonly property var controllerKeywords: [
+        "controller",
+        "gamepad",
+        "joystick",
+        "xbox",
+        "dualshock",
+        "dualsense",
+        "playstation",
+        "switch pro",
+        "joy-con",
+        "8bitdo",
+        "steam controller"
+    ]
+
+    function controllerScore(props) {
+        if (!props.IsPresent)
+            return 0;
+
+        const percentage = Number(props.Percentage);
+        if (isNaN(percentage))
+            return 0;
+
+        const type = Number(props.Type ?? -1);
+        const model = String(props.Model || "");
+        const nativePath = String(props.NativePath || "");
+        const iconName = String(props.IconName || "");
+        const searchable = (model + " " + nativePath + " " + iconName).toLowerCase();
+
+        let score = 0;
+        if (type === 12)
+            score += 10;
+
+        for (const keyword of controllerKeywords) {
+            if (searchable.includes(keyword))
+                score += 4;
+        }
+
+        if (searchable.includes("wireless"))
+            score += 1;
+
+        return score;
+    }
+
+    function applyBestController(candidate) {
+        if (!candidate) {
+            controllerName = "";
+            controllerBatteryLevel = -1;
+            controllerBatteryCharging = false;
+            controllerBatteryStatus = "";
+            return;
+        }
+
+        controllerName = candidate.name;
+        controllerBatteryLevel = candidate.level;
+        controllerBatteryCharging = candidate.charging;
+        controllerBatteryStatus = candidate.status;
+    }
+
+    function refreshControllerBattery() {
+        const token = _scanToken + 1;
+        _scanToken = token;
+
+        DMSService.dbusCall("system", upowerService, upowerPath, upowerInterface, "EnumerateDevices", [], response => {
+            if (token !== _scanToken)
+                return;
+
+            if (response.error) {
+                applyBestController(null);
+                return;
+            }
+
+            const devicePaths = response.result?.values?.[0] || [];
+            if (!devicePaths.length) {
+                applyBestController(null);
+                return;
+            }
+
+            let pending = devicePaths.length;
+            let bestCandidate = null;
+
+            for (const devicePath of devicePaths) {
+                DMSService.dbusGetAllProperties("system", upowerService, devicePath, upowerDeviceInterface, deviceResponse => {
+                    if (token !== _scanToken)
+                        return;
+
+                    pending -= 1;
+
+                    if (!deviceResponse.error) {
+                        const props = deviceResponse.result || {};
+                        const score = controllerScore(props);
+
+                        if (score > 0) {
+                            const state = Number(props.State ?? 0);
+                            const status = (state === 1 || state === 4 || state === 5) ? "Charging" : "Discharging";
+                            const charging = status === "Charging";
+                            const level = Math.round(Number(props.Percentage ?? -1));
+                            const model = String(props.Model || "").trim();
+
+                            const candidate = {
+                                score: score,
+                                name: model || fallbackText,
+                                level: level,
+                                charging: charging,
+                                status: status
+                            };
+
+                            if (!bestCandidate || candidate.score > bestCandidate.score)
+                                bestCandidate = candidate;
+                        }
+                    }
+
+                    if (pending === 0)
+                        applyBestController(bestCandidate);
+                });
+            }
+        });
+    }
+
+    Component.onCompleted: refreshControllerBattery()
+
+    Connections {
+        target: DMSService
+
+        function onConnectionStateChanged() {
+            if (DMSService.isConnected)
+                refreshControllerBattery();
+        }
+    }
+
+    Timer {
+        interval: root.refreshIntervalMs
+        repeat: true
+        running: true
+        triggeredOnStart: true
+        onTriggered: root.refreshControllerBattery()
+    }
+
+    horizontalBarPill: Component {
+        Row {
+            spacing: Theme.spacingS
+
+            Item {
+                width: controllerIcon.width
+                height: controllerIcon.height
+                anchors.verticalCenter: parent.verticalCenter
+
+                DankIcon {
+                    id: controllerIcon
+                    name: "sports_esports"
+                    size: Theme.iconSize
+                    color: Theme.primary
+                    anchors.verticalCenter: parent.verticalCenter
+                }
+
+                DankIcon {
+                    visible: root.controllerBatteryCharging
+                    name: "bolt"
+                    size: controllerIcon.size * 0.45
+                    color: Theme.primary
+                    anchors.right: parent.right
+                    anchors.bottom: parent.bottom
+                    anchors.rightMargin: -2
+                    anchors.bottomMargin: -1
+                }
+            }
+
+            Row {
+                spacing: Theme.spacingXS
+                anchors.verticalCenter: parent.verticalCenter
+
+                StyledText {
+                    visible: root.hasControllerBattery && !!root.controllerName
+                    text: root.controllerName
+                    font.pixelSize: Theme.fontSizeMedium
+                    color: Theme.surfaceText
+                    anchors.verticalCenter: parent.verticalCenter
+                }
+
+                StyledText {
+                    visible: root.hasControllerBattery
+                    text: root.controllerPercentageText
+                    font.pixelSize: Theme.fontSizeMedium
+                    color: root.controllerBatteryCharging ? Theme.primary : Theme.surfaceText
+                    anchors.verticalCenter: parent.verticalCenter
+                }
+
+                StyledText {
+                    visible: root.hasControllerBattery
+                    text: "(" + root.controllerStatusText + ")"
+                    font.pixelSize: Theme.fontSizeMedium
+                    color: Theme.surfaceText
+                    anchors.verticalCenter: parent.verticalCenter
+                }
+
+                StyledText {
+                    visible: !root.hasControllerBattery
+                    text: " - "
+                    font.pixelSize: Theme.fontSizeMedium
+                    color: Theme.surfaceText
+                    anchors.verticalCenter: parent.verticalCenter
+                }
+            }
+        }
+    }
+
+    verticalBarPill: Component {
+        Column {
+            spacing: Theme.spacingXS
+
+            Item {
+                width: controllerIconV.width
+                height: controllerIconV.height
+                anchors.horizontalCenter: parent.horizontalCenter
+
+                DankIcon {
+                    id: controllerIconV
+                    name: "sports_esports"
+                    size: Theme.iconSize
+                    color: Theme.primary
+                    anchors.horizontalCenter: parent.horizontalCenter
+                }
+
+                DankIcon {
+                    visible: root.controllerBatteryCharging
+                    name: "bolt"
+                    size: controllerIconV.size * 0.45
+                    color: Theme.primary
+                    anchors.right: parent.right
+                    anchors.bottom: parent.bottom
+                    anchors.rightMargin: -2
+                    anchors.bottomMargin: -1
+                }
+            }
+
+            Column {
+                spacing: 0
+                anchors.horizontalCenter: parent.horizontalCenter
+
+                StyledText {
+                    visible: root.hasControllerBattery
+                    text: root.controllerPercentageText
+                    font.pixelSize: Theme.fontSizeSmall
+                    color: root.controllerBatteryCharging ? Theme.primary : Theme.surfaceText
+                    anchors.horizontalCenter: parent.horizontalCenter
+                }
+
+                StyledText {
+                    visible: root.hasControllerBattery
+                    text: root.controllerStatusText
+                    font.pixelSize: Theme.fontSizeSmall
+                    color: Theme.surfaceText
+                    anchors.horizontalCenter: parent.horizontalCenter
+                }
+
+                StyledText {
+                    visible: !root.hasControllerBattery
+                    text: " - "
+                    font.pixelSize: Theme.fontSizeSmall
+                    color: Theme.surfaceText
+                    anchors.horizontalCenter: parent.horizontalCenter
+                }
+            }
+        }
+    }
+}

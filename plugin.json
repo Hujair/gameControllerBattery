@@ -1,0 +1,12 @@
+{
+  "id": "GameControllerBattery",
+  "name": "Game Controller Battery",
+  "description": "Shows the battery level of the connected game controller",
+  "version": "0.1.0",
+  "author": "Mohammad Hujair",
+  "icon": "widgets",
+  "type": "widget",
+  "component": "./GameControllerBatteryWidget.qml",
+  "settings": "./GameControllerBatterySettings.qml",
+  "permissions": ["settings_read", "settings_write"]
+}
