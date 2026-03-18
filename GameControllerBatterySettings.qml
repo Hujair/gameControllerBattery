@@ -33,8 +33,8 @@ PluginSettings {
 
     SliderSetting {
         settingKey: "refreshInterval"
-        label: "Refresh Interval"
-        description: "How often to check controller battery"
+        label: "Fallback Refresh Interval"
+        description: "Fallback polling interval when no battery signal event arrives"
         defaultValue: 15
         minimum: 5
         maximum: 30

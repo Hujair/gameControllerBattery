@@ -8,11 +8,13 @@ PluginComponent {
     id: root
 
     property string fallbackText: pluginData.displayText || "Controller"
+    property string controllerDevicePath: ""
     property string controllerName: ""
     property int controllerBatteryLevel: -1
     property bool controllerBatteryCharging: false
     property string controllerBatteryStatus: ""
     property int _scanToken: 0
+    property bool _subscribedToUpower: false
 
     readonly property int refreshIntervalSeconds: (pluginData.refreshInterval ?? 15)
     readonly property int refreshIntervalMs: refreshIntervalSeconds * 1000
@@ -22,6 +24,47 @@ PluginComponent {
     readonly property string upowerInterface: "org.freedesktop.UPower"
     readonly property string upowerDeviceInterface: "org.freedesktop.UPower.Device"
     readonly property bool hasControllerBattery: controllerBatteryLevel >= 0
+    readonly property int warningBatteryThreshold: 20
+    readonly property bool lowBatteryWarning: hasControllerBattery && !controllerBatteryCharging && controllerBatteryLevel <= warningBatteryThreshold
+    readonly property string controllerSubIconName: {
+        if (!hasControllerBattery)
+            return "";
+
+        if (controllerBatteryCharging) {
+            if (controllerBatteryLevel >= 95)
+                return "battery_charging_full";
+            if (controllerBatteryLevel >= 75)
+                return "battery_charging_80";
+            if (controllerBatteryLevel >= 55)
+                return "battery_charging_60";
+            if (controllerBatteryLevel >= 30)
+                return "battery_charging_30";
+            return "battery_charging_20";
+        }
+
+        if (controllerBatteryLevel >= 90)
+            return "battery_6_bar";
+        if (controllerBatteryLevel >= 75)
+            return "battery_5_bar";
+        if (controllerBatteryLevel >= 60)
+            return "battery_4_bar";
+        if (controllerBatteryLevel >= 45)
+            return "battery_3_bar";
+        if (controllerBatteryLevel >= 25)
+            return "battery_2_bar";
+        if (controllerBatteryLevel >= 15)
+            return "battery_1_bar";
+        return "battery_alert";
+    }
+    readonly property color controllerSubIconColor: {
+        if (!hasControllerBattery)
+            return Theme.surfaceVariantText;
+        if (lowBatteryWarning)
+            return Theme.warning;
+        if (controllerBatteryCharging)
+            return Theme.primary;
+        return Theme.surfaceVariantText;
+    }
     readonly property string controllerStatusText: {
         if (!hasControllerBattery)
             return "";
@@ -73,6 +116,7 @@ PluginComponent {
 
     function applyBestController(candidate) {
         if (!candidate) {
+            controllerDevicePath = "";
             controllerName = "";
             controllerBatteryLevel = -1;
             controllerBatteryCharging = false;
@@ -80,13 +124,59 @@ PluginComponent {
             return;
         }
 
+        controllerDevicePath = candidate.path || "";
         controllerName = candidate.name;
         controllerBatteryLevel = candidate.level;
         controllerBatteryCharging = candidate.charging;
         controllerBatteryStatus = candidate.status;
     }
 
-    function refreshControllerBattery() {
+    function makeCandidate(props, devicePath, score) {
+        const state = Number(props.State ?? 0);
+        const status = (state === 1 || state === 4 || state === 5) ? "Charging" : "Discharging";
+        const charging = status === "Charging";
+        const level = Math.round(Number(props.Percentage ?? -1));
+        const model = String(props.Model || "").trim();
+
+        return {
+            score: score,
+            path: devicePath,
+            name: model || fallbackText,
+            level: level,
+            charging: charging,
+            status: status
+        };
+    }
+
+    function subscribeToUpowerSignals() {
+        if (_subscribedToUpower || !DMSService.isConnected)
+            return;
+
+        _subscribedToUpower = true;
+        DMSService.dbusSubscribe("system", upowerService, "", "", "", response => {
+            if (response.error)
+                _subscribedToUpower = false;
+        });
+    }
+
+    function handleUpowerSignal(data) {
+        if (data.member === "DeviceAdded") {
+            discoverControllerBattery();
+            return;
+        }
+
+        if (data.member === "DeviceRemoved") {
+            const removedPath = data.body?.[0] || "";
+            if (!controllerDevicePath || removedPath === controllerDevicePath)
+                discoverControllerBattery();
+            return;
+        }
+
+        if (data.member === "PropertiesChanged" && controllerDevicePath && data.path === controllerDevicePath)
+            refreshControllerBattery();
+    }
+
+    function discoverControllerBattery() {
         const token = _scanToken + 1;
         _scanToken = token;
 
@@ -120,20 +210,7 @@ PluginComponent {
                         const score = controllerScore(props);
 
                         if (score > 0) {
-                            const state = Number(props.State ?? 0);
-                            const status = (state === 1 || state === 4 || state === 5) ? "Charging" : "Discharging";
-                            const charging = status === "Charging";
-                            const level = Math.round(Number(props.Percentage ?? -1));
-                            const model = String(props.Model || "").trim();
-
-                            const candidate = {
-                                score: score,
-                                name: model || fallbackText,
-                                level: level,
-                                charging: charging,
-                                status: status
-                            };
-
+                            const candidate = makeCandidate(props, devicePath, score);
                             if (!bestCandidate || candidate.score > bestCandidate.score)
                                 bestCandidate = candidate;
                         }
@@ -146,14 +223,54 @@ PluginComponent {
         });
     }
 
-    Component.onCompleted: refreshControllerBattery()
+    function refreshControllerBattery() {
+        if (!controllerDevicePath) {
+            discoverControllerBattery();
+            return;
+        }
+
+        const token = _scanToken + 1;
+        _scanToken = token;
+
+        DMSService.dbusGetAllProperties("system", upowerService, controllerDevicePath, upowerDeviceInterface, response => {
+            if (token !== _scanToken)
+                return;
+
+            if (response.error) {
+                discoverControllerBattery();
+                return;
+            }
+
+            const props = response.result || {};
+            const score = controllerScore(props);
+            if (score <= 0) {
+                discoverControllerBattery();
+                return;
+            }
+
+            applyBestController(makeCandidate(props, controllerDevicePath, score));
+        });
+    }
+
+    Component.onCompleted: {
+        subscribeToUpowerSignals();
+        refreshControllerBattery();
+    }
 
     Connections {
         target: DMSService
 
         function onConnectionStateChanged() {
-            if (DMSService.isConnected)
+            if (DMSService.isConnected) {
+                subscribeToUpowerSignals();
                 refreshControllerBattery();
+            } else {
+                _subscribedToUpower = false;
+            }
+        }
+
+        function onDbusSignalReceived(subId, data) {
+            handleUpowerSignal(data);
         }
     }
 
@@ -183,10 +300,10 @@ PluginComponent {
                 }
 
                 DankIcon {
-                    visible: root.controllerBatteryCharging
-                    name: "bolt"
-                    size: controllerIcon.size * 0.45
-                    color: Theme.primary
+                    visible: root.hasControllerBattery
+                    name: root.controllerSubIconName
+                    size: controllerIcon.size * 0.52
+                    color: root.controllerSubIconColor
                     anchors.right: parent.right
                     anchors.bottom: parent.bottom
                     anchors.rightMargin: -2
@@ -211,14 +328,6 @@ PluginComponent {
                     text: root.controllerPercentageText
                     font.pixelSize: Theme.fontSizeMedium
                     color: root.controllerBatteryCharging ? Theme.primary : Theme.surfaceText
-                    anchors.verticalCenter: parent.verticalCenter
-                }
-
-                StyledText {
-                    visible: root.hasControllerBattery
-                    text: "(" + root.controllerStatusText + ")"
-                    font.pixelSize: Theme.fontSizeMedium
-                    color: Theme.surfaceText
                     anchors.verticalCenter: parent.verticalCenter
                 }
 
@@ -251,10 +360,10 @@ PluginComponent {
                 }
 
                 DankIcon {
-                    visible: root.controllerBatteryCharging
-                    name: "bolt"
-                    size: controllerIconV.size * 0.45
-                    color: Theme.primary
+                    visible: root.hasControllerBattery
+                    name: root.controllerSubIconName
+                    size: controllerIconV.size * 0.52
+                    color: root.controllerSubIconColor
                     anchors.right: parent.right
                     anchors.bottom: parent.bottom
                     anchors.rightMargin: -2
@@ -271,14 +380,6 @@ PluginComponent {
                     text: root.controllerPercentageText
                     font.pixelSize: Theme.fontSizeSmall
                     color: root.controllerBatteryCharging ? Theme.primary : Theme.surfaceText
-                    anchors.horizontalCenter: parent.horizontalCenter
-                }
-
-                StyledText {
-                    visible: root.hasControllerBattery
-                    text: root.controllerStatusText
-                    font.pixelSize: Theme.fontSizeSmall
-                    color: Theme.surfaceText
                     anchors.horizontalCenter: parent.horizontalCenter
                 }
 
