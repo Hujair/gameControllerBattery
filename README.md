@@ -1,6 +1,6 @@
 # Game Controller Battery Plugin
 
-A DankMaterialShell widget plugin that shows the battery level of your connected game controller in the bar.
+A DankMaterialShell widget plugin that shows the battery level of connected game controllers in the bar.
 
 ## Features
 
@@ -61,6 +61,10 @@ The top-scoring controller is used for the small battery overlay icon while the 
   - Charging/discharging battery overlay icon based on the top-scoring detected controller
 - If no suitable controller battery is found, the widget shows a fallback state.
 
+## Screenshot
+
+![Game Controller Battery widget screenshot](./dms-screenshot-1773854869435.png)
+
 ## Troubleshooting
 
 ### No battery shown
@@ -96,8 +100,34 @@ gameControllerBattery/
 
 - Plugin ID: `GameControllerBattery`
 - Name: `Game Controller Battery`
-- Version: `0.1.0`
+- Version: `1.0.0`
 - Author: `Mohammad Hujair`
+
+## Publishing
+
+1. Create a GitHub repository for this plugin and push the code.
+2. Ensure these publication files are present:
+  - `plugin.json`
+  - `README.md`
+  - at least one screenshot (currently `dms-screenshot-1773854869435.png`)
+3. Tag and push the release:
+
+```bash
+git tag v1.0.0
+git push --tags
+```
+
+4. Submit the plugin to `dms-plugin-registry` by opening a pull request with this repo link and metadata.
+
+### Useful examples
+
+- `ColorDemoPlugin`
+- `ExampleEmojiPlugin`
+- `ControlCenterExample`
+- `LauncherExample`
+- `WallpaperWatcherDaemon`
+- `DankGifSearch`
+- `DankStickerSearch`
 
 ## License
 
