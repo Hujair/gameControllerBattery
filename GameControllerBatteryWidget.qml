@@ -8,11 +8,7 @@ PluginComponent {
     id: root
 
     property string fallbackText: pluginData.displayText || "Controller"
-    property string controllerDevicePath: ""
-    property string controllerName: ""
-    property int controllerBatteryLevel: -1
-    property bool controllerBatteryCharging: false
-    property string controllerBatteryStatus: ""
+    property var controllerDevices: []
     property int _scanToken: 0
     property bool _subscribedToUpower: false
 
@@ -23,54 +19,12 @@ PluginComponent {
     readonly property string upowerPath: "/org/freedesktop/UPower"
     readonly property string upowerInterface: "org.freedesktop.UPower"
     readonly property string upowerDeviceInterface: "org.freedesktop.UPower.Device"
-    readonly property bool hasControllerBattery: controllerBatteryLevel >= 0
+    readonly property bool hasControllerBattery: controllerDevices.length > 0
     readonly property int warningBatteryThreshold: 20
-    readonly property bool lowBatteryWarning: hasControllerBattery && !controllerBatteryCharging && controllerBatteryLevel <= warningBatteryThreshold
-    readonly property string controllerSubIconName: {
-        if (!hasControllerBattery)
-            return "";
-
-        if (controllerBatteryCharging) {
-            if (controllerBatteryLevel >= 95)
-                return "battery_charging_full";
-            if (controllerBatteryLevel >= 75)
-                return "battery_charging_80";
-            if (controllerBatteryLevel >= 55)
-                return "battery_charging_60";
-            if (controllerBatteryLevel >= 30)
-                return "battery_charging_30";
-            return "battery_charging_20";
-        }
-
-        if (controllerBatteryLevel >= 90)
-            return "battery_6_bar";
-        if (controllerBatteryLevel >= 75)
-            return "battery_5_bar";
-        if (controllerBatteryLevel >= 60)
-            return "battery_4_bar";
-        if (controllerBatteryLevel >= 45)
-            return "battery_3_bar";
-        if (controllerBatteryLevel >= 25)
-            return "battery_2_bar";
-        if (controllerBatteryLevel >= 15)
-            return "battery_1_bar";
-        return "battery_alert";
-    }
-    readonly property color controllerSubIconColor: {
-        if (!hasControllerBattery)
-            return Theme.surfaceVariantText;
-        if (lowBatteryWarning)
-            return Theme.warning;
-        if (controllerBatteryCharging)
-            return Theme.primary;
-        return Theme.surfaceVariantText;
-    }
-    readonly property string controllerStatusText: {
-        if (!hasControllerBattery)
-            return "";
-        return controllerBatteryStatus || (controllerBatteryCharging ? "Charging" : "Discharging");
-    }
-    readonly property string controllerPercentageText: hasControllerBattery ? (controllerBatteryLevel + "%") : " - "
+    readonly property int maxVerticalControllersShown: 3
+    readonly property var primaryController: hasControllerBattery ? controllerDevices[0] : null
+    readonly property string controllerSubIconName: controllerSubIconNameFor(primaryController)
+    readonly property color controllerSubIconColor: controllerSubIconColorFor(primaryController)
     readonly property var controllerKeywords: [
         "controller",
         "gamepad",
@@ -84,6 +38,79 @@ PluginComponent {
         "8bitdo",
         "steam controller"
     ]
+
+    function lowBatteryWarningFor(controller) {
+        if (!controller)
+            return false;
+
+        return !controller.charging && controller.level <= warningBatteryThreshold;
+    }
+
+    function controllerSubIconNameFor(controller) {
+        if (!controller)
+            return "";
+
+        const level = Number(controller.level ?? -1);
+        if (isNaN(level) || level < 0)
+            return "";
+
+        if (controller.charging) {
+            if (level >= 95)
+                return "battery_charging_full";
+            if (level >= 75)
+                return "battery_charging_80";
+            if (level >= 55)
+                return "battery_charging_60";
+            if (level >= 30)
+                return "battery_charging_30";
+            return "battery_charging_20";
+        }
+
+        if (level >= 90)
+            return "battery_6_bar";
+        if (level >= 75)
+            return "battery_5_bar";
+        if (level >= 60)
+            return "battery_4_bar";
+        if (level >= 45)
+            return "battery_3_bar";
+        if (level >= 25)
+            return "battery_2_bar";
+        if (level >= 15)
+            return "battery_1_bar";
+        return "battery_alert";
+    }
+
+    function controllerSubIconColorFor(controller) {
+        if (!controller)
+            return Theme.surfaceVariantText;
+        if (lowBatteryWarningFor(controller))
+            return Theme.warning;
+        if (controller.charging)
+            return Theme.primary;
+        return Theme.surfaceVariantText;
+    }
+
+    function controllerPercentageText(controller) {
+        if (!controller)
+            return " - ";
+
+        const level = Number(controller.level ?? -1);
+        if (isNaN(level) || level < 0)
+            return " - ";
+
+        return level + "%";
+    }
+
+    function controllerTextColor(controller) {
+        if (!controller)
+            return Theme.surfaceText;
+        if (lowBatteryWarningFor(controller))
+            return Theme.warning;
+        if (controller.charging)
+            return Theme.primary;
+        return Theme.surfaceText;
+    }
 
     function controllerScore(props) {
         if (!props.IsPresent)
@@ -114,28 +141,42 @@ PluginComponent {
         return score;
     }
 
-    function applyBestController(candidate) {
-        if (!candidate) {
-            controllerDevicePath = "";
-            controllerName = "";
-            controllerBatteryLevel = -1;
-            controllerBatteryCharging = false;
-            controllerBatteryStatus = "";
+    function applyControllers(candidates) {
+        if (!candidates || !candidates.length) {
+            controllerDevices = [];
             return;
         }
 
-        controllerDevicePath = candidate.path || "";
-        controllerName = candidate.name;
-        controllerBatteryLevel = candidate.level;
-        controllerBatteryCharging = candidate.charging;
-        controllerBatteryStatus = candidate.status;
+        const seenPath = {};
+        const normalized = [];
+
+        for (const candidate of candidates) {
+            if (!candidate || !candidate.path || seenPath[candidate.path])
+                continue;
+
+            seenPath[candidate.path] = true;
+            normalized.push(candidate);
+        }
+
+        normalized.sort((a, b) => {
+            if (a.score !== b.score)
+                return b.score - a.score;
+            if (a.name !== b.name)
+                return a.name.localeCompare(b.name);
+            return a.path.localeCompare(b.path);
+        });
+
+        controllerDevices = normalized;
     }
 
     function makeCandidate(props, devicePath, score) {
+        const percentage = Number(props.Percentage ?? -1);
+        if (isNaN(percentage))
+            return null;
+
         const state = Number(props.State ?? 0);
-        const status = (state === 1 || state === 4 || state === 5) ? "Charging" : "Discharging";
-        const charging = status === "Charging";
-        const level = Math.round(Number(props.Percentage ?? -1));
+        const charging = (state === 1 || state === 4 || state === 5);
+        const level = Math.max(0, Math.min(100, Math.round(percentage)));
         const model = String(props.Model || "").trim();
 
         return {
@@ -143,9 +184,20 @@ PluginComponent {
             path: devicePath,
             name: model || fallbackText,
             level: level,
-            charging: charging,
-            status: status
+            charging: charging
         };
+    }
+
+    function isTrackedControllerPath(devicePath) {
+        if (!devicePath)
+            return false;
+
+        for (const controller of controllerDevices) {
+            if (controller.path === devicePath)
+                return true;
+        }
+
+        return false;
     }
 
     function subscribeToUpowerSignals() {
@@ -166,13 +218,11 @@ PluginComponent {
         }
 
         if (data.member === "DeviceRemoved") {
-            const removedPath = data.body?.[0] || "";
-            if (!controllerDevicePath || removedPath === controllerDevicePath)
-                discoverControllerBattery();
+            discoverControllerBattery();
             return;
         }
 
-        if (data.member === "PropertiesChanged" && controllerDevicePath && data.path === controllerDevicePath)
+        if (data.member === "PropertiesChanged" && isTrackedControllerPath(data.path))
             refreshControllerBattery();
     }
 
@@ -185,18 +235,18 @@ PluginComponent {
                 return;
 
             if (response.error) {
-                applyBestController(null);
+                applyControllers([]);
                 return;
             }
 
             const devicePaths = response.result?.values?.[0] || [];
             if (!devicePaths.length) {
-                applyBestController(null);
+                applyControllers([]);
                 return;
             }
 
             let pending = devicePaths.length;
-            let bestCandidate = null;
+            const candidates = [];
 
             for (const devicePath of devicePaths) {
                 DMSService.dbusGetAllProperties("system", upowerService, devicePath, upowerDeviceInterface, deviceResponse => {
@@ -211,45 +261,20 @@ PluginComponent {
 
                         if (score > 0) {
                             const candidate = makeCandidate(props, devicePath, score);
-                            if (!bestCandidate || candidate.score > bestCandidate.score)
-                                bestCandidate = candidate;
+                            if (candidate)
+                                candidates.push(candidate);
                         }
                     }
 
                     if (pending === 0)
-                        applyBestController(bestCandidate);
+                        applyControllers(candidates);
                 });
             }
         });
     }
 
     function refreshControllerBattery() {
-        if (!controllerDevicePath) {
-            discoverControllerBattery();
-            return;
-        }
-
-        const token = _scanToken + 1;
-        _scanToken = token;
-
-        DMSService.dbusGetAllProperties("system", upowerService, controllerDevicePath, upowerDeviceInterface, response => {
-            if (token !== _scanToken)
-                return;
-
-            if (response.error) {
-                discoverControllerBattery();
-                return;
-            }
-
-            const props = response.result || {};
-            const score = controllerScore(props);
-            if (score <= 0) {
-                discoverControllerBattery();
-                return;
-            }
-
-            applyBestController(makeCandidate(props, controllerDevicePath, score));
-        });
+        discoverControllerBattery();
     }
 
     Component.onCompleted: {
@@ -315,20 +340,36 @@ PluginComponent {
                 spacing: Theme.spacingXS
                 anchors.verticalCenter: parent.verticalCenter
 
-                StyledText {
-                    visible: root.hasControllerBattery && !!root.controllerName
-                    text: root.controllerName
-                    font.pixelSize: Theme.fontSizeMedium
-                    color: Theme.surfaceText
-                    anchors.verticalCenter: parent.verticalCenter
-                }
+                Repeater {
+                    model: root.controllerDevices
 
-                StyledText {
-                    visible: root.hasControllerBattery
-                    text: root.controllerPercentageText
-                    font.pixelSize: Theme.fontSizeMedium
-                    color: root.controllerBatteryCharging ? Theme.primary : Theme.surfaceText
-                    anchors.verticalCenter: parent.verticalCenter
+                    delegate: Row {
+                        spacing: Theme.spacingXS
+                        anchors.verticalCenter: parent.verticalCenter
+
+                        StyledText {
+                            visible: !!modelData.name
+                            text: modelData.name
+                            font.pixelSize: Theme.fontSizeMedium
+                            color: Theme.surfaceText
+                            anchors.verticalCenter: parent.verticalCenter
+                        }
+
+                        StyledText {
+                            text: root.controllerPercentageText(modelData)
+                            font.pixelSize: Theme.fontSizeMedium
+                            color: root.controllerTextColor(modelData)
+                            anchors.verticalCenter: parent.verticalCenter
+                        }
+
+                        StyledText {
+                            visible: index < root.controllerDevices.length - 1
+                            text: "|"
+                            font.pixelSize: Theme.fontSizeMedium
+                            color: Theme.surfaceVariantText
+                            anchors.verticalCenter: parent.verticalCenter
+                        }
+                    }
                 }
 
                 StyledText {
@@ -375,11 +416,22 @@ PluginComponent {
                 spacing: 0
                 anchors.horizontalCenter: parent.horizontalCenter
 
+                Repeater {
+                    model: root.controllerDevices.slice(0, root.maxVerticalControllersShown)
+
+                    delegate: StyledText {
+                        text: root.controllerPercentageText(modelData)
+                        font.pixelSize: Theme.fontSizeSmall
+                        color: root.controllerTextColor(modelData)
+                        anchors.horizontalCenter: parent.horizontalCenter
+                    }
+                }
+
                 StyledText {
-                    visible: root.hasControllerBattery
-                    text: root.controllerPercentageText
+                    visible: root.controllerDevices.length > root.maxVerticalControllersShown
+                    text: "+" + (root.controllerDevices.length - root.maxVerticalControllersShown)
                     font.pixelSize: Theme.fontSizeSmall
-                    color: root.controllerBatteryCharging ? Theme.primary : Theme.surfaceText
+                    color: Theme.surfaceVariantText
                     anchors.horizontalCenter: parent.horizontalCenter
                 }
 

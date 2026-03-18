@@ -6,6 +6,7 @@ A DankMaterialShell widget plugin that shows the battery level of your connected
 
 - Detects game controllers through UPower over D-Bus
 - Shows battery percentage in horizontal and vertical bar layouts
+- Supports multiple connected controllers at the same time
 - Displays charging/discharging state with dynamic battery icons
 - Highlights low battery state (20% and below)
 - Reacts to live UPower events (device add/remove/property changes)
@@ -48,15 +49,17 @@ The plugin scans UPower devices and scores candidates using:
 - Model/native path/icon name keyword matching (for example: controller, gamepad, xbox, dualsense, switch pro)
 - Presence and validity of battery percentage
 
-The best-scoring device is used as the active controller source.
+All matching controllers are kept, de-duplicated by device path, and sorted by score.
+The top-scoring controller is used for the small battery overlay icon while the list view shows each matched controller battery.
 
 ## Usage
 
 - Connect your controller (Bluetooth or USB).
+- Connect additional controllers if needed.
 - The widget should show:
   - Controller icon
-  - Battery percentage (for example: 76%)
-  - Charging/discharging battery overlay icon
+  - Battery percentage for each detected controller
+  - Charging/discharging battery overlay icon based on the top-scoring detected controller
 - If no suitable controller battery is found, the widget shows a fallback state.
 
 ## Troubleshooting
@@ -75,7 +78,7 @@ The best-scoring device is used as the active controller source.
 - Lower the Fallback Refresh Interval in plugin settings.
 - Verify UPower is emitting device/property changes on your system.
 
-### Wrong device selected
+### Unexpected device appears in the list
 
 - Disconnect other battery-powered peripherals temporarily and reconnect the controller.
 - Ensure your controller reports battery via UPower on your distro/driver stack.
