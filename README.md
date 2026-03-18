@@ -25,7 +25,6 @@ A DankMaterialShell widget plugin that shows the battery level of your connected
    ~/.config/DankMaterialShell/plugins/gameControllerBattery/
 
 2. Ensure the plugin contains these files:
-
    - `plugin.json`
    - `GameControllerBatteryWidget.qml`
    - `GameControllerBatterySettings.qml`
@@ -36,10 +35,10 @@ A DankMaterialShell widget plugin that shows the battery level of your connected
 
 Open plugin settings in DankMaterialShell and configure:
 
-| Setting | Type | Default | Range | Description |
-|---|---|---|---|---|
-| Fallback Label | String | Controller | - | Shown when no controller battery info is available |
-| Fallback Refresh Interval | Slider | 15 sec | 5-30 sec | Polling interval used as a fallback when no signal event arrives |
+| Setting                   | Type   | Default    | Range    | Description                                                      |
+| ------------------------- | ------ | ---------- | -------- | ---------------------------------------------------------------- |
+| Fallback Label            | String | Controller | -        | Shown when no controller battery info is available               |
+| Fallback Refresh Interval | Slider | 15 sec     | 5-30 sec | Polling interval used as a fallback when no signal event arrives |
 
 ## How Detection Works
 
