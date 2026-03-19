@@ -5,7 +5,7 @@ import qs.Widgets
 
 PluginSettings {
     id: root
-    pluginId: "GameControllerBattery"
+    pluginId: "gameControllerBattery"
 
     StyledText {
         width: parent.width

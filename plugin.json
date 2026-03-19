@@ -1,5 +1,5 @@
 {
-  "id": "GameControllerBattery",
+  "id": "gameControllerBattery",
   "name": "Game Controller Battery",
   "description": "Shows the battery level of connected game controllers",
   "version": "1.0.0",
