@@ -8,5 +8,5 @@
   "type": "widget",
   "component": "./GameControllerBatteryWidget.qml",
   "settings": "./GameControllerBatterySettings.qml",
-  "permissions": ["settings_read", "settings_write"]
+  "permissions": ["settings_read", "settings_write", "process"]
 }

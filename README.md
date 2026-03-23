@@ -1,65 +1,73 @@
-# Game Controller Battery Plugin
+# Game Controller Battery
 
-A DankMaterialShell widget plugin that shows the battery level of connected game controllers in the bar.
+DankMaterialShell widget plugin that shows battery levels for connected game controllers using UPower.
 
 ## Features
 
-- Detects game controllers through UPower over D-Bus
-- Shows battery percentage in horizontal and vertical bar layouts
-- Supports multiple connected controllers at the same time
-- Displays charging/discharging state with dynamic battery icons
-- Highlights low battery state (20% and below)
-- Reacts to live UPower events (device add/remove/property changes)
-- Includes fallback polling when no event arrives
+- Detects controller batteries from `org.freedesktop.UPower`
+- Supports multiple connected controllers
+- Shows charging state and low-battery state
+- Updates from D-Bus events, polling, or both
+- Optional desktop notification when a controller connects
+- Works in horizontal and vertical DankBar layouts
 
-## Requirements
+## Plugin Manifest
 
-- Linux desktop with UPower running (`org.freedesktop.UPower`)
-- DankMaterialShell with plugin support enabled
-- D-Bus access to the system bus
+This plugin follows the DMS widget plugin structure documented at:
+
+- `type: "widget"`
+- `component: "./GameControllerBatteryWidget.qml"`
+- `settings: "./GameControllerBatterySettings.qml"`
+- `permissions: ["settings_read", "settings_write", "process"]`
+
+The `process` permission is required because the plugin uses `notify-send` for connection notifications.
 
 ## Installation
 
-1. Place this plugin directory at:
+1. Place or symlink this directory at `~/.config/DankMaterialShell/plugins/gameControllerBattery`.
+2. Open DMS Settings and scan for plugins.
+3. Enable `Game Controller Battery`.
+4. Add it to DankBar from the widget list.
 
-   ~/.config/DankMaterialShell/plugins/gameControllerBattery/
+For development reloads, use:
 
-2. Ensure the plugin contains these files:
-   - `plugin.json`
-   - `GameControllerBatteryWidget.qml`
-   - `GameControllerBatterySettings.qml`
+```bash
+dms ipc call plugins reload gameControllerBattery
+```
 
-3. Restart or reload DankMaterialShell.
+Check current status with:
 
-## Configuration
+```bash
+dms ipc call plugins status gameControllerBattery
+```
 
-Open plugin settings in DankMaterialShell and configure:
+## Settings
 
-| Setting                   | Type   | Default    | Range    | Description                                                      |
-| ------------------------- | ------ | ---------- | -------- | ---------------------------------------------------------------- |
-| Fallback Label            | String | Controller | -        | Shown when no controller battery info is available               |
-| Fallback Refresh Interval | Slider | 15 sec     | 5-30 sec | Polling interval used as a fallback when no signal event arrives |
+The plugin uses `PluginSettings` and exposes these settings:
 
-## How Detection Works
+| Setting                    | Type      | Default  | Description                                                     |
+| -------------------------- | --------- | -------- | --------------------------------------------------------------- |
+| Show Controller Count Only | Toggle    | `false`  | Hides controller names and keeps the compact percentage display |
+| Controller Name Length     | Slider    | `16`     | Maximum displayed controller name length                        |
+| Connection Notifications   | Toggle    | `true`   | Sends a desktop notification when a controller connects         |
+| Update Method              | Selection | `event`  | Chooses D-Bus events, polling, or both                          |
+| Fallback Refresh Interval  | Slider    | `15 sec` | Polling interval used when polling is enabled                   |
 
-The plugin scans UPower devices and scores candidates using:
+## Detection Logic
 
-- Device type (prefers UPower peripheral/controller-like devices)
-- Model/native path/icon name keyword matching (for example: controller, gamepad, xbox, dualsense, switch pro)
-- Presence and validity of battery percentage
+The widget enumerates UPower devices and scores candidates using:
 
-All matching controllers are kept, de-duplicated by device path, and sorted by score.
-The top-scoring controller is used for the small battery overlay icon while the list view shows each matched controller battery.
+- Device type
+- Model, native path, and icon-name keyword matching
+- Valid battery percentage availability
 
-## Usage
+Matching devices are de-duplicated by UPower path and sorted by score. The top match drives the overlay battery indicator, and all matched controllers are shown in the widget display.
 
-- Connect your controller (Bluetooth or USB).
-- Connect additional controllers if needed.
-- The widget should show:
-  - Controller icon
-  - Battery percentage for each detected controller
-  - Charging/discharging battery overlay icon based on the top-scoring detected controller
-- If no suitable controller battery is found, the widget shows a fallback state.
+## Requirements
+
+- DankMaterialShell with 3rd party plugin support
+- UPower running on the system bus
+- Controller battery support exposed through UPower
 
 ## Screenshot
 
@@ -67,42 +75,29 @@ The top-scoring controller is used for the small battery overlay icon while the 
 
 ## Troubleshooting
 
-### No battery shown
+### No controller battery appears
 
-- Check UPower availability:
-  - `busctl --system list | grep org.freedesktop.UPower`
-- Check discovered devices:
-  - `upower -e`
-- Inspect controller device details:
-  - `upower -i <device-path>`
-
-### Battery updates are delayed
-
-- Lower the Fallback Refresh Interval in plugin settings.
-- Verify UPower is emitting device/property changes on your system.
-
-### Unexpected device appears in the list
-
-- Disconnect other battery-powered peripherals temporarily and reconnect the controller.
-- Ensure your controller reports battery via UPower on your distro/driver stack.
-
-## File Structure
-
-```text
-gameControllerBattery/
-├── plugin.json
-├── GameControllerBatteryWidget.qml
-├── GameControllerBatterySettings.qml
-└── README.md
+```bash
+busctl --system list | grep org.freedesktop.UPower
+upower -e
+upower -i <device-path>
 ```
+
+### Updates are delayed
+
+- Switch `Update Method` to `both` or `poll`
+- Lower `Fallback Refresh Interval`
+- Verify your controller emits UPower property changes on your system
+
+### Plugin loads but notifications do not appear
+
+- Confirm `notify-send` is installed
+- Keep `Connection Notifications` enabled
+- Ensure the plugin manifest still includes the `process` permission
 
 ## Metadata
 
-- Plugin ID: `GameControllerBattery`
+- Plugin ID: `gameControllerBattery`
 - Name: `Game Controller Battery`
 - Version: `1.0.0`
 - Author: `Mohammad Hujair`
-
-## License
-
-MIT (or project default if inherited from DankMaterialShell).
