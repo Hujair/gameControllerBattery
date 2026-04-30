@@ -145,7 +145,7 @@ PluginComponent {
         if (!enableConnectionNotifications || !controller)
             return;
 
-        const name = String(controller.name || fallbackText);
+        const name = controllerDisplayName(controller) || String(controller.name || fallbackText);
         const eventLabel = eventType === "disconnected" ? "disconnected" : "connected";
         const dedupKey = eventLabel + ":" + name.trim().toLowerCase();
         const now = Date.now();
