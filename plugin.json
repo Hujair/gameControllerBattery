@@ -2,7 +2,7 @@
   "id": "gameControllerBattery",
   "name": "Game Controller Battery",
   "description": "Shows the battery level of connected game controllers",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "author": "Mohammad Hujair",
   "icon": "widgets",
   "type": "widget",

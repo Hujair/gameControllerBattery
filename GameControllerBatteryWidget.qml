@@ -29,6 +29,10 @@ PluginComponent {
     readonly property string updateMethod: (pluginData.updateMethod ?? "event")
     readonly property bool enableConnectionNotifications: (pluginData.enableConnectionNotifications !== false)
     readonly property int settingsSessionToken: Number(pluginData.settingsSessionToken ?? 0)
+    readonly property var controllerCustomNames: {
+        const v = pluginData.controllerCustomNames;
+        return (v && typeof v === "object") ? v : {};
+    }
 
     readonly property string upowerService: "org.freedesktop.UPower"
     readonly property string upowerPath: "/org/freedesktop/UPower"
@@ -186,15 +190,16 @@ PluginComponent {
         if (!controller)
             return "";
 
-        const name = String(controller.name || "");
-        if (!name)
+        const customName = String(controllerCustomNames[controller.path] ?? "").trim();
+        const base = customName || String(controller.name || "");
+        if (!base)
             return "";
 
         const maxLength = Number(controllerNameMaxLength ?? 16);
-        if (isNaN(maxLength) || maxLength < 1 || name.length <= maxLength)
-            return name;
+        if (isNaN(maxLength) || maxLength < 1 || base.length <= maxLength)
+            return base;
 
-        return name.slice(0, maxLength);
+        return base.slice(0, maxLength);
     }
 
     function controllerScore(props) {
@@ -286,6 +291,21 @@ PluginComponent {
         controllerDevices = normalized;
         _knownControllerPaths = nextPaths;
         _hasCompletedInitialDiscovery = true;
+
+        if (pluginService) {
+            const previousKnown = pluginService.loadPluginState(pluginId, "knownControllers", []);
+            const knownMap = {};
+            if (Array.isArray(previousKnown)) {
+                for (const c of previousKnown) {
+                    if (c && c.path)
+                        knownMap[c.path] = c;
+                }
+            }
+            for (const c of normalized) {
+                knownMap[c.path] = { path: c.path, name: c.name };
+            }
+            pluginService.savePluginState(pluginId, "knownControllers", Object.values(knownMap));
+        }
     }
 
     function makeCandidate(props, devicePath, score) {

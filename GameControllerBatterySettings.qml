@@ -42,10 +42,21 @@ PluginSettings {
         radius: Theme.cornerRadius
         color: Theme.surfaceContainerHigh
 
+        property var knownControllers: []
+        property var customNames: ({})
+
         function loadValue() {
             displayModeSetting.loadValue();
             controllerNameMaxLengthSetting.loadValue();
             connectionNotificationSetting.loadValue();
+
+            const names = root.loadValue("controllerCustomNames", {});
+            displaySection.customNames = (names && typeof names === "object") ? names : {};
+
+            if (pluginService) {
+                const known = pluginService.loadPluginState(root.pluginId, "knownControllers", []);
+                displaySection.knownControllers = Array.isArray(known) ? known : [];
+            }
         }
 
         Column {
@@ -86,6 +97,97 @@ PluginSettings {
                 label: "Enable Notifications"
                 description: "Show desktop notifications when a controller connects or disconnects"
                 defaultValue: true
+            }
+
+            Rectangle {
+                width: parent.width
+                height: 1
+                color: Theme.surfaceVariantText
+                opacity: 0.25
+            }
+
+            StyledText {
+                text: "Custom Controller Names"
+                font.pixelSize: Theme.fontSizeSmall
+                font.weight: Font.Medium
+                color: Theme.surfaceText
+            }
+
+            StyledText {
+                text: "Override the displayed name for each controller by their unique device ID. Connect a controller at least once for it to appear here."
+                font.pixelSize: Theme.fontSizeSmall
+                color: Theme.surfaceVariantText
+                width: parent.width
+                wrapMode: Text.WordWrap
+            }
+
+            StyledText {
+                visible: displaySection.knownControllers.length === 0
+                text: "No controllers detected yet. Connect a controller and it will appear here."
+                font.pixelSize: Theme.fontSizeSmall
+                color: Theme.surfaceVariantText
+                width: parent.width
+                wrapMode: Text.WordWrap
+                font.italic: true
+            }
+
+            Repeater {
+                id: customNameRepeater
+                model: displaySection.knownControllers
+
+                delegate: Column {
+                    width: parent.width
+                    spacing: Theme.spacingXS
+
+                    StyledText {
+                        text: {
+                            const parts = (modelData.path || "").split("/");
+                            return parts[parts.length - 1] || modelData.name || "Controller";
+                        }
+                        font.pixelSize: Theme.fontSizeSmall
+                        font.weight: Font.Medium
+                        color: Theme.surfaceText
+                        width: parent.width
+                        elide: Text.ElideRight
+                    }
+
+                    StyledText {
+                        text: "Default: " + (modelData.name || "Unknown")
+                        font.pixelSize: Theme.fontSizeSmall
+                        color: Theme.surfaceVariantText
+                        width: parent.width
+                        elide: Text.ElideRight
+                    }
+
+                    DankTextField {
+                        id: customNameField
+                        width: parent.width
+                        text: displaySection.customNames[modelData.path] || ""
+                        placeholderText: "Custom name (leave empty to use default)"
+                    }
+                }
+            }
+
+            DankButton {
+                visible: displaySection.knownControllers.length > 0
+                width: parent.width
+                text: "Apply"
+                iconName: "check"
+                buttonHeight: 28
+                horizontalPadding: Theme.spacingS
+                iconSize: 16
+                onClicked: {
+                    const names = {};
+                    for (let i = 0; i < customNameRepeater.count; i++) {
+                        const item = customNameRepeater.itemAt(i);
+                        const fieldText = item ? item.children[2].text.trim() : "";
+                        const path = displaySection.knownControllers[i].path;
+                        if (fieldText)
+                            names[path] = fieldText;
+                    }
+                    displaySection.customNames = names;
+                    root.saveValue("controllerCustomNames", names);
+                }
             }
         }
     }
