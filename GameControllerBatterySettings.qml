@@ -7,6 +7,11 @@ PluginSettings {
     id: root
     pluginId: "gameControllerBattery"
 
+     Component.onCompleted: {
+        displaySection.loadValue();
+        updateSection.loadValue();
+    }
+
     Component.onDestruction: {
         root.saveValue("settingsSessionToken", Date.now());
     }
