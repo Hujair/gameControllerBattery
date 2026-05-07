@@ -18,6 +18,9 @@ PluginSettings {
 
     property var updateModes: ["both", "event", "poll"]
     property var updateModeLabels: ["Both", "Event", "Polling"]
+    readonly property int titleTextSize: Theme.fontSizeLarge
+    readonly property int sectionTitleTextSize: Theme.fontSizeMedium
+    readonly property int bodyTextSize: Theme.fontSizeSmall
 
     function updateModeLabel(mode) {
         const idx = updateModes.indexOf(mode || "event");
@@ -27,7 +30,7 @@ PluginSettings {
     StyledText {
         width: parent.width
         text: "Game Controller Battery"
-        font.pixelSize: Theme.fontSizeLarge
+        font.pixelSize: root.titleTextSize
         font.weight: Font.Bold
         color: Theme.surfaceText
     }
@@ -35,7 +38,7 @@ PluginSettings {
     StyledText {
         width: parent.width
         text: "Configure how controller battery information is displayed and refreshed"
-        font.pixelSize: Theme.fontSizeSmall
+        font.pixelSize: root.bodyTextSize
         color: Theme.surfaceVariantText
         wrapMode: Text.WordWrap
     }
@@ -54,6 +57,7 @@ PluginSettings {
             displayModeSetting.loadValue();
             controllerNameMaxLengthSetting.loadValue();
             connectionNotificationSetting.loadValue();
+            hideWhenNoControllersConnectedSetting.loadValue();
 
             const names = root.loadValue("controllerCustomNames", {});
             displaySection.customNames = (names && typeof names === "object") ? names : {};
@@ -72,7 +76,7 @@ PluginSettings {
 
             StyledText {
                 text: "Display"
-                font.pixelSize: Theme.fontSizeMedium
+                font.pixelSize: root.sectionTitleTextSize
                 font.weight: Font.Medium
                 color: Theme.surfaceText
             }
@@ -104,6 +108,14 @@ PluginSettings {
                 defaultValue: true
             }
 
+            ToggleSetting {
+                id: hideWhenNoControllersConnectedSetting
+                settingKey: "hideWhenNoControllersConnected"
+                label: "Hide When No Controllers Connected"
+                description: "Hide this widget when no controller battery is detected"
+                defaultValue: false
+            }
+
             Rectangle {
                 width: parent.width
                 height: 1
@@ -113,14 +125,14 @@ PluginSettings {
 
             StyledText {
                 text: "Custom Controller Names"
-                font.pixelSize: Theme.fontSizeSmall
+                font.pixelSize: root.sectionTitleTextSize
                 font.weight: Font.Medium
                 color: Theme.surfaceText
             }
 
             StyledText {
                 text: "Override the displayed name for each controller by their unique device ID. Connect a controller at least once for it to appear here."
-                font.pixelSize: Theme.fontSizeSmall
+                font.pixelSize: root.bodyTextSize
                 color: Theme.surfaceVariantText
                 width: parent.width
                 wrapMode: Text.WordWrap
@@ -129,7 +141,7 @@ PluginSettings {
             StyledText {
                 visible: displaySection.knownControllers.length === 0
                 text: "No controllers detected yet. Connect a controller and it will appear here."
-                font.pixelSize: Theme.fontSizeSmall
+                font.pixelSize: root.bodyTextSize
                 color: Theme.surfaceVariantText
                 width: parent.width
                 wrapMode: Text.WordWrap
@@ -149,7 +161,7 @@ PluginSettings {
                             const parts = (modelData.path || "").split("/");
                             return parts[parts.length - 1] || modelData.name || "Controller";
                         }
-                        font.pixelSize: Theme.fontSizeSmall
+                        font.pixelSize: root.bodyTextSize
                         font.weight: Font.Medium
                         color: Theme.surfaceText
                         width: parent.width
@@ -158,7 +170,7 @@ PluginSettings {
 
                     StyledText {
                         text: "Default: " + (modelData.name || "Unknown")
-                        font.pixelSize: Theme.fontSizeSmall
+                        font.pixelSize: root.bodyTextSize
                         color: Theme.surfaceVariantText
                         width: parent.width
                         elide: Text.ElideRight
@@ -218,14 +230,14 @@ PluginSettings {
 
             StyledText {
                 text: "Update Behavior"
-                font.pixelSize: Theme.fontSizeMedium
+                font.pixelSize: root.sectionTitleTextSize
                 font.weight: Font.Medium
                 color: Theme.surfaceText
             }
 
             StyledText {
                 text: "Choose how battery updates are received"
-                font.pixelSize: Theme.fontSizeSmall
+                font.pixelSize: root.bodyTextSize
                 color: Theme.surfaceVariantText
                 width: parent.width
                 wrapMode: Text.WordWrap
@@ -240,7 +252,7 @@ PluginSettings {
                 minButtonWidth: Theme.iconSizeLarge + Theme.spacingL
                 buttonPadding: Theme.spacingS
                 checkIconSize: 0
-                textSize: Theme.fontSizeSmall
+                textSize: root.bodyTextSize
                 checkEnabled: false
                 currentIndex: {
                     var mode = root.loadValue("updateMethod", "event");
@@ -267,7 +279,7 @@ PluginSettings {
 
             StyledText {
                 text: "Current Method: " + root.updateModeLabel(root.loadValue("updateMethod", "event"))
-                font.pixelSize: Theme.fontSizeSmall
+                font.pixelSize: root.bodyTextSize
                 color: Theme.surfaceVariantText
                 width: parent.width
                 wrapMode: Text.WordWrap
@@ -275,7 +287,7 @@ PluginSettings {
 
             StyledText {
                 text: "When to use each method:\n- Event: Best default. Fast updates with low overhead.\n- Polling: Use if event updates are not working on your system.\n- Both: Most reliable fallback, but may use slightly more resources."
-                font.pixelSize: Theme.fontSizeSmall
+                font.pixelSize: root.bodyTextSize
                 color: Theme.surfaceVariantText
                 width: parent.width
                 wrapMode: Text.WordWrap

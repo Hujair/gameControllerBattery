@@ -25,6 +25,7 @@ PluginComponent {
     readonly property int idleRefreshIntervalMs: refreshIntervalMs
     readonly property int discoveryTimeoutMs: 1500
     readonly property bool showCountMode: (pluginData.displayMode ?? false)
+    readonly property bool hideWhenNoControllersConnected: (pluginData.hideWhenNoControllersConnected === true)
     readonly property int controllerNameMaxLength: (pluginData.controllerNameMaxLength ?? 16)
     readonly property string updateMethod: (pluginData.updateMethod ?? "event")
     readonly property bool enableConnectionNotifications: (pluginData.enableConnectionNotifications !== false)
@@ -131,6 +132,11 @@ PluginComponent {
         _refreshQueued = true;
         refreshDebounce.interval = Math.max(50, Number(delayMs) || 250);
         refreshDebounce.restart();
+    }
+
+    function updateWidgetVisibilityOverride() {
+        const shouldShow = hasControllerBattery || !hideWhenNoControllersConnected;
+        setVisibilityOverride(shouldShow);
     }
 
     function notifyControllerConnected(controller) {
@@ -415,9 +421,13 @@ PluginComponent {
 
     Component.onCompleted: {
         _lastAppliedSettingsToken = settingsSessionToken;
+        updateWidgetVisibilityOverride();
         subscribeToUpowerSignals();
         queueRefresh(0);
     }
+
+    onHasControllerBatteryChanged: updateWidgetVisibilityOverride()
+    onHideWhenNoControllersConnectedChanged: updateWidgetVisibilityOverride()
 
     onPluginDataChanged: {
         if (settingsSessionToken === _lastAppliedSettingsToken)
