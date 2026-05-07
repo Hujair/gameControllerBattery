@@ -45,14 +45,14 @@ dms ipc call plugins status gameControllerBattery
 
 The plugin uses `PluginSettings` and exposes these settings:
 
-| Setting                    | Type      | Default  | Description                                                     |
-| -------------------------- | --------- | -------- | --------------------------------------------------------------- |
-| Show Controller Count Only | Toggle    | `false`  | Hides controller names and keeps the compact percentage display |
-| Controller Name Length     | Slider    | `16`     | Maximum displayed controller name length                        |
-| Connection Notifications   | Toggle    | `true`   | Sends a desktop notification when a controller connects         |
-| Hide When No Controllers Connected | Toggle | `false` | Hides the widget when no controller battery is detected         |
-| Update Method              | Selection | `event`  | Chooses D-Bus events, polling, or both                          |
-| Fallback Refresh Interval  | Slider    | `15 sec` | Polling interval used when polling is enabled                   |
+| Setting                            | Type      | Default  | Description                                                     |
+| ---------------------------------- | --------- | -------- | --------------------------------------------------------------- |
+| Show Controller Count Only         | Toggle    | `false`  | Hides controller names and keeps the compact percentage display |
+| Controller Name Length             | Slider    | `16`     | Maximum displayed controller name length                        |
+| Connection Notifications           | Toggle    | `true`   | Sends a desktop notification when a controller connects         |
+| Hide When No Controllers Connected | Toggle    | `false`  | Hides the widget when no controller battery is detected         |
+| Update Method                      | Selection | `event`  | Chooses D-Bus events, polling, or both                          |
+| Fallback Refresh Interval          | Slider    | `15 sec` | Polling interval used when polling is enabled                   |
 
 ## Detection Logic
 
